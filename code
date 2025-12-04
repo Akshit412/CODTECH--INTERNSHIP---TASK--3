@@ -1,0 +1,103 @@
+import dash
+from dash import dcc, html
+from dash.dependencies import Input, Output
+import plotly.graph_objs as go
+import pandas as pd
+import random
+from datetime import datetime
+
+# ------------ Simulated live data storage ------------
+df = pd.DataFrame({"time": [], "value": []})
+
+# ------------ Dash App Setup ------------
+app = dash.Dash(__name__)
+
+app.layout = html.Div(
+    style={"padding": "20px", "font-family": "Arial"},
+    children=[
+        html.H1("📊 REAL-TIME BI DASHBOARD", style={"text-align": "center"}),
+
+        # KPIs
+        html.Div(
+            id="kpi-container",
+            style={"display": "flex", "justify-content": "space-around",
+                   "margin-bottom": "30px"},
+        ),
+
+        # Live chart
+        dcc.Graph(id="live-chart"),
+
+        # Auto-refresh every 1 second
+        dcc.Interval(id="interval-component", interval=1000, n_intervals=0),
+    ]
+)
+
+# ------------ Callbacks ------------
+
+# Update data + chart
+@app.callback(
+    [Output("live-chart", "figure"),
+     Output("kpi-container", "children")],
+    
+    [Input("interval-component", "n_intervals")]
+)
+def update_dashboard(n):
+
+    global df
+
+    # Simulate new data point
+    new_row = {
+        "time": datetime.now(),
+        "value": random.randint(50, 100)
+    }
+    df.loc[len(df)] = new_row
+    
+    # Keep last 60 seconds
+    df_trim = df.tail(60)
+
+    # Live line chart
+    fig = go.Figure(
+        data=[go.Scatter(x=df_trim["time"], y=df_trim["value"],
+                         mode="lines+markers", line=dict(color="cyan", width=3))]
+    )
+    fig.update_layout(
+        title="Live Data Stream",
+        xaxis_title="Time",
+        yaxis_title="Value",
+        template="plotly_dark"
+    )
+
+    # KPI cards
+    kpis = [
+        html.Div(
+            style={"background": "#1f2c56", "padding": "20px",
+                   "border-radius": "10px", "color": "white"},
+            children=[
+                html.H3("Current Value"),
+                html.H1(df_trim["value"].iloc[-1])
+            ],
+        ),
+        html.Div(
+            style={"background": "#1f2c56", "padding": "20px",
+                   "border-radius": "10px", "color": "white"},
+            children=[
+                html.H3("Max (last 60s)"),
+                html.H1(df_trim["value"].max())
+            ],
+        ),
+        html.Div(
+            style={"background": "#1f2c56", "padding": "20px",
+                   "border-radius": "10px", "color": "white"},
+            children=[
+                html.H3("Min (last 60s)"),
+                html.H1(df_trim["value"].min())
+            ],
+        ),
+    ]
+
+    return fig, kpis
+
+
+# ------------ Run Server ------------
+if __name__ == "__main__":
+    app.run_server(debug=True)
